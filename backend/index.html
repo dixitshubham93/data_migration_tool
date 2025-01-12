@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image Upload Form</title>
+  </head>
+  <body>
+    <h1>Upload Cover Image and Avatar</h1>
+
+    <!-- The form uses multipart/form-data because it is uploading files -->
+    <form
+      action="http://localhost:4000/user/register"
+      method="POST"
+      enctype="multipart/form-data"
+    >
+      <!-- Input for Cover Image -->
+      <label for="coverImage">Cover Image:</label>
+      <input
+        type="file"
+        id="coverImage"
+        name="coverImage"
+        accept="image/*"
+      /><br /><br />
+
+      <!-- Input for Avatar -->
+      <label for="avatar">Avatar:</label>
+      <input
+        type="file"
+        id="avatar"
+        name="avatar"
+        accept="image/*"
+        required
+      /><br /><br />
+      <!-- Input for password -->
+      <label for="password">password:</label>
+      <input
+        type="text"
+        id="password"
+        name="password"
+        required
+      /><br /><br /><!-- Input for Avatar -->
+      <label for="email">email:</label>
+      <input
+        type="text"
+        id="email"
+        name="email"
+        required
+      /><br /><br /><!-- Input for Avatar -->
+      <label for="username">username:</label>
+      <input type="text" id="username" name="username" required /><br /><br />
+      <!-- Input for Avatar -->
+      <label for="fullName">fullName:</label>
+      <input type="text" id="fullName" name="fullName" required /><br /><br />
+      <!-- Submit Button -->
+      <button type="submit">Upload Images</button>
+    </form>
+  </body>
+</html>
