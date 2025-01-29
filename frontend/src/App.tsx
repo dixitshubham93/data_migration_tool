@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import  { useState } from 'react';
 import { Database, ArrowRight, Settings, AlertCircle } from 'lucide-react';
-import DatabaseConfig from './components/DatabaseConfig';
 import DataPreview from './components/DataPreview';
 
 const databaseTypes = [
@@ -14,8 +13,35 @@ const databaseTypes = [
 function App() {
   const [sourceType, setSourceType] = useState('');
   const [targetType, setTargetType] = useState('');
-  const [sourceConfig, setSourceConfig] = useState(null);
-  const [targetConfig, setTargetConfig] = useState(null);
+  const [sourceConfig, setSourceConfig] = useState('');
+  const [targetConfig, setTargetConfig] = useState('');
+
+  const handleMigration = async () => {
+    try {
+      const response = await fetch('/api/migrate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sourceType,
+          sourceConfig,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Migration started successfully:', data);
+        alert('Migration started successfully');
+      } else {
+        console.error('Failed to start migration:', response.statusText);
+        alert('Failed to start migration. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error while starting migration:', error);
+      alert('An error occurred. Please check the console for more details.');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
@@ -44,7 +70,7 @@ function App() {
           <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="border-b border-gray-200 bg-gray-50 px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900">Source Database</h2>
-              <p className="text-sm text-gray-500">Select your source database type</p>
+              <p className="text-sm text-gray-500">Select your source cloud database type</p>
             </div>
             <div className="p-6">
               <select
@@ -61,11 +87,12 @@ function App() {
               </select>
 
               {sourceType && (
-                <DatabaseConfig
-                  type={sourceType}
-                  onConfigSubmit={setSourceConfig}
-                  className="mt-6"
-                />
+                <div>
+                  <p className="text-sm text-gray-500 my-1">Enter your source global database Connection string</p>
+                  <input className='w-full my-3 ' onChange={(e)=>{setSourceConfig(e.target.value)}} type='text' id='url' placeholder='protocol://username:password@hostname:port/database
+'></input>
+                 
+                </div>
               )}
 
               {sourceConfig && (
@@ -106,11 +133,12 @@ function App() {
               </select>
 
               {targetType && (
-                <DatabaseConfig
-                  type={targetType}
-                  onConfigSubmit={setTargetConfig}
-                  className="mt-6"
-                />
+                <div>
+                <p className="text-sm text-gray-500 my-1">Enter your source global database Connection string</p>
+                <input className='w-full my-3 ' onChange={(e)=>{setTargetConfig(e.target.value)}} type='text' id='url' placeholder='protocol://username:password@hostname:port/database
+'></input>
+                
+              </div>
               )}
 
               {targetConfig && (
@@ -123,7 +151,7 @@ function App() {
             </div>
           </div>
         </div>
-
+        
         {(!sourceType || !targetType) && (
           <div className="mt-8 flex items-center justify-center p-4 bg-yellow-50 rounded-lg border border-yellow-200">
             <AlertCircle className="h-5 w-5 text-yellow-500 mr-2" />
@@ -137,9 +165,7 @@ function App() {
           <div className="mt-8 flex justify-center">
             <button
               className="px-8 py-4 bg-blue-600 text-white text-lg font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-              onClick={() => {
-                console.log('Starting migration...');
-              }}
+              onClick={handleMigration}
             >
               Start Migration
             </button>

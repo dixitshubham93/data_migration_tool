@@ -1,19 +1,11 @@
-import dbconnect from "./db/dbconnection.js";
 import dotenv from "dotenv";
+import fatchMongoDatabase from "./from/mongoconnection.js"
 import { app } from "./App.js";
 
 dotenv.config({
   path: "./.env",
 });
-
-dbconnect()
-  .then(() => {
-    const port = process.env.PORT || 8000;
-    app.listen(port, () => {
-      console.log(`Listening on the port :${port}`);
-    });
-  })
-  .catch(() => {
-    console.log("database connection is failed");
-  });
-
+const uri = 'mongodb+srv://dixitshubham8873:LV1G1dTec1hO3hWy@mycluster.98leq.mongodb.net/?retryWrites=true&w=majority&appName=MyCluster';
+  const database = "sample_mflix";
+fatchMongoDatabase(uri,database);
+  

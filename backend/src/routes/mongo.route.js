@@ -1,5 +1,5 @@
 import { Router } from "express";
-import mongofetchcontroller from "../controllers/mongofetch.controller.js";
+// import mongofetchcontroller from "../controllers/mongofetch.controller.js";
 const mongodbRouter= Router();
-mongodbRouter.route('./').post(mongofetchcontroller);
+// mongodbRouter.route('./mongocollect').post(mongofetchcontroller);
 export{ mongodbRouter};
