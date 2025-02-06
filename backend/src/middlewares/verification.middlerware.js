@@ -1,6 +1,5 @@
 import jwt from "jsonwebtoken";
-import { User } from "../models/user.models.js";
-import { ApiError } from "../utils/ApiError.utils.js";
+import  ApiError  from "../utils/ApiError.utils.js";
 const verification = async (req, res, next) => {
   try {
     const refreshToken = req.cookies?.refreshToken;

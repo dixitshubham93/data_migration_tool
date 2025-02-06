@@ -1,6 +1,6 @@
 import express from "express";
 import cookieParser from "cookie-parser";
-import {mongodbRouter} from "./routes/mongo.route.js";
+import migrateRouter from "./routes/migrateRouter.js";
 
 const app = express();
 
@@ -12,6 +12,7 @@ app.use(cookieParser());
 app.get("/", (req, res) => {
   res.send("<h1>listening started</h1>");
 });
-app.use("/mongodbfetch", mongodbRouter);
+
+app.use("/migrate", migrateRouter);
 
 export { app };
