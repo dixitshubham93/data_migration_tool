@@ -1,40 +1,67 @@
 import { MongoClient } from "mongodb";
-import asyncHandler from "./asyncHandler.utils.js";
 import ApiError from "./ApiError.utils.js";
+import mysql from "mysql2/promise";
 
-
-const checkConnection = async function (data) {
-  if (!data) {
-    throw new ApiError("all field are must required", 400);
+const checkConnection = async function(data){
+  
+  if (!data || !data.protocol || !data.database) {
+    throw new ApiError("All fields are required", 400);
   }
-//   handling mongodb connection
-  if (data.protocol == "mongodb") {
+
+  // Handling MongoDB connection
+  if (data.protocol === "mongodb") {
+    let client;
     try {
-      const connectionString = `mongodb://${data.database}:${data.password}@${data.host}:${data.port}/${data.database}?authSource=admin`;
+      const connectionString =
+        data.host === "localhost"
+          ? "mongodb://127.0.0.1:27017/"
+          : `mongodb+srv://${data.username}:${data.password}@${data.host}/?retryWrites=true&w=majority&appName=MyCluster`;
       const client = new MongoClient(connectionString);
       await client.connect();
-      const db = client.db(database);
-      if (!db) {
-        throw new ApiError(
-          "database is not found check for any spelling mistake in database name",
-          404
-        );
-      }
-      console.log("database connected succesfully");
-      return true;
+      console.log("✅ MongoDB connected successfully to", data.database);
+     
     } catch (error) {
-      console.log("connection is failed", error);
-      throw new ApiError(
-        "database is not connected may be credential are wrong",
-        500
-      );
-      return false;
+      console.error("❌ MongoDB connection failed:", error);
+      throw new ApiError("MongoDB connection failed. Check credentials.", 400);
+    } finally {
+      if (client) {
+        await client.close(); // Ensure connection is closed
+        console.log("🔌 MongoDB connection closed.");
+      }
     }
-    // handling mysql connection
-  } else if (data.protocol == "mysql") {
-
   }
 
-};
+  // Handling MySQL connection (Placeholder)
+  else if (data.protocol === "mysql") {
+    try {
+      // ✅ Create a connection
+      const client = await mysql.createConnection({
+        host: data.host,
+        user: data.username,
+        port: data.port,
+        password:data.password,
+        database: data.database // ✅ Directly specify the database here
+      });
+  
+      console.log("✅ MySQL connected successfully to", data.database);
+  
+      // ✅ No need to explicitly run `USE database`
+      // MySQL connection automatically selects the database if provided
+  
+      // ✅ Close the connection
+      await client.end();
+      console.log("✅ Connection closed for", data.database);
+  
+    } catch (error) {
+      console.error("❌ MySQL connection failed:", error.message);
+      throw new Error("MySQL connection failed. Check credentials.",400);
+    }
+  }
+
+  // If protocol is not recognized
+  else {
+    throw new ApiError("Unsupported database protocol", 400);
+  }
+}
 
 export default checkConnection;

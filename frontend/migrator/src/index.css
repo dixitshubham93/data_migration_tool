@@ -1,0 +1,7 @@
+@import "tailwindcss";
+@font-face {
+    font-family: 'LabilGrotesk';
+    src: url('https://chroniclehq.com/fonts/LabilGrotesk-Light.woff2') format('woff2');
+    font-weight: 300; /* Light weight */
+    font-style: normal;
+  }
