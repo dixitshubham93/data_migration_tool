@@ -11,9 +11,9 @@ const client = new MongoClient(uri);
 
   try {
     // Attempt to connect to the MongoDB server
+    
     await client.connect();
     console.log('Database connected successfully!');
-
     // Optional: Check the connection state
     if (client.topology.isConnected()) {
       console.log('Connection state: Connected');

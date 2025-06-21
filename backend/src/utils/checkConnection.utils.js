@@ -40,7 +40,7 @@ const checkConnection = async function(data){
         user: data.username,
         port: data.port,
         password:data.password,
-        database: data.database // ✅ Directly specify the database here
+        // ✅ Directly specify the database here
       });
   
       console.log("✅ MySQL connected successfully to", data.database);
