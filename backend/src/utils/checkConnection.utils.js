@@ -4,7 +4,7 @@ import mysql from "mysql2/promise";
 
 const checkConnection = async function(data){
   
-  if (!data || !data.protocol || !data.database) {
+  if (!data || !data.protocol) {
     throw new ApiError("All fields are required", 400);
   }
 
@@ -14,7 +14,7 @@ const checkConnection = async function(data){
     try {
       const connectionString =
         data.host === "localhost"
-          ? "mongodb://127.0.0.1:27017/"
+          ? `mongodb://127.0.0.1:${data.port}/`
           : `mongodb+srv://${data.username}:${data.password}@${data.host}/?retryWrites=true&w=majority&appName=MyCluster`;
       const client = new MongoClient(connectionString);
       await client.connect();
@@ -43,14 +43,14 @@ const checkConnection = async function(data){
         // ✅ Directly specify the database here
       });
   
-      console.log("✅ MySQL connected successfully to", data.database);
+      console.log("✅ MySQL connected successfully");
   
       // ✅ No need to explicitly run `USE database`
       // MySQL connection automatically selects the database if provided
   
       // ✅ Close the connection
       await client.end();
-      console.log("✅ Connection closed for", data.database);
+      console.log("✅ Connection closed ");
   
     } catch (error) {
       console.error("❌ MySQL connection failed:", error.message);

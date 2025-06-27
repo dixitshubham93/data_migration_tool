@@ -1,5 +1,6 @@
 import makeConnection from "../utils/makeConnection.js";
 import { ObjectId } from "mongodb";
+import crypto from "crypto";
 
 function inferSQLType(value) {
   if (value === null || value === undefined) return "TEXT";
@@ -13,7 +14,7 @@ function inferSQLType(value) {
   return "TEXT";
 }
 
-function flattenObject(obj, prefix = '', parentId = null) {
+function flattenObject(obj, prefix = '') {
   let result = {};
   for (let key in obj) {
     const val = obj[key];
@@ -33,6 +34,22 @@ function flattenObject(obj, prefix = '', parentId = null) {
     }
   }
   return result;
+}
+
+function detectRelationships(doc, collectionNames) {
+  const references = [];
+  for (const key in doc) {
+    if (
+      key.toLowerCase().endsWith("id") &&
+      doc[key] instanceof ObjectId
+    ) {
+      const refCollection = key.replace(/id$/i, '').toLowerCase();
+      if (collectionNames.includes(refCollection)) {
+        references.push({ column: key, references: refCollection });
+      }
+    }
+  }
+  return references;
 }
 
 async function transform(data, options = { normalize: true, generateER: true }) {
@@ -61,35 +78,37 @@ async function transform(data, options = { normalize: true, generateER: true }) 
 
       let fieldTypeMap = {};
       let foreignKeys = [];
+      let skipAttributes = new Set();
 
       for (const sample of samples) {
-        const flat = flattenObject(sample);
-        for (const key in flat) {
-          if (!(key in fieldTypeMap)) {
-            fieldTypeMap[key] = inferSQLType(flat[key]);
-
-            // Infer foreign key if ends with Id and value is ObjectId
-            if (
-              key.toLowerCase().endsWith("id") &&
-              sample[key] instanceof ObjectId &&
-              collectionNames.includes(key.replace(/id$/i, '').toLowerCase())
-            ) {
-              foreignKeys.push({ column: key, references: key.replace(/id$/i, '').toLowerCase() });
-            }
+        for (const key in sample) {
+          const val = sample[key];
+          if (Array.isArray(val) && val.length && typeof val[0] === 'object') {
+            skipAttributes.add(key);
+          } else if (typeof val === 'object' && val !== null && !(val instanceof Date) && !val._bsontype && !Array.isArray(val)) {
+            skipAttributes.add(key);
+          } else {
+            fieldTypeMap[key] = inferSQLType(val);
           }
         }
+        foreignKeys.push(...detectRelationships(sample, collectionNames));
       }
 
-      const createQuery = `CREATE TABLE IF NOT EXISTS \`${collectionName}\` (${Object.entries(fieldTypeMap)
-        .map(([k, type]) => `\`${k}\` ${type}`)
-        .join(", ")}${foreignKeys.length ? ', ' + foreignKeys.map(fk => `FOREIGN KEY (\`${fk.column}\`) REFERENCES \`${fk.references}\`(_id)`).join(', ') : ''})`;
+      const createQuery = `CREATE TABLE IF NOT EXISTS \`${collectionName}\` (
+        \`_id\` VARCHAR(24) PRIMARY KEY,
+        ${Object.entries(fieldTypeMap)
+          .filter(([k]) => k !== '_id')
+          .map(([k, type]) => `\`${k}\` ${type}`)
+          .join(", ")}
+        ${foreignKeys.length ? ', ' + foreignKeys.map(fk => `FOREIGN KEY (\`${fk.column}\`) REFERENCES \`${fk.references}\`(_id)`).join(', ') : ''}
+      )`;
 
       await mysqlConn.query(createQuery);
 
       if (options.generateER) {
         erDiagram.push({
           table: collectionName,
-          columns: Object.entries(fieldTypeMap).map(([name, type]) => ({ name, type })),
+          columns: [{ name: '_id', type: 'VARCHAR(24)' }, ...Object.entries(fieldTypeMap).filter(([k]) => k !== '_id').map(([name, type]) => ({ name, type }))],
           foreignKeys
         });
       }
@@ -97,9 +116,69 @@ async function transform(data, options = { normalize: true, generateER: true }) 
       const documents = await collection.find().toArray();
 
       for (const doc of documents) {
-        const id = doc._id;
+        const id = doc._id?.toString() ?? crypto.randomUUID();
+        const clonedDoc = { ...doc, _id: id };
 
-        const flatDoc = flattenObject(doc);
+        if (options.normalize) {
+          for (const key of skipAttributes) {
+            const val = doc[key];
+            const nestedTable = `${collectionName}_${key}`;
+
+            if (Array.isArray(val) && val.length && typeof val[0] === 'object') {
+              for (const item of val) {
+                const itemId = crypto.randomUUID();
+                const nestedFlat = flattenObject(item);
+                nestedFlat._id = itemId;
+                nestedFlat[`${collectionName}_ref_id`] = id;
+
+                const nestedTypeMap = Object.fromEntries(
+                  Object.entries(nestedFlat).map(([k, v]) => [k, inferSQLType(v)])
+                );
+
+                const nestedCreate = `CREATE TABLE IF NOT EXISTS \`${nestedTable}\` (${Object.entries(nestedTypeMap)
+                  .map(([k, type]) => `\`${k}\` ${type}`)
+                  .join(', ')})`;
+                await mysqlConn.query(nestedCreate);
+
+                const nestedKeys = Object.keys(nestedFlat);
+                const nestedValues = nestedKeys.map(k => nestedFlat[k]);
+                const nestedInsert = `INSERT INTO \`${nestedTable}\` (${nestedKeys.map(k => `\`${k}\``).join(', ')}) VALUES (${nestedKeys.map(() => '?').join(', ')})`;
+                await mysqlConn.query(nestedInsert, nestedValues);
+              }
+            }
+
+            else if (
+              typeof val === "object" &&
+              val !== null &&
+              !(val instanceof Date) &&
+              !Array.isArray(val) &&
+              !val._bsontype
+            ) {
+              const nestedId = crypto.randomUUID();
+              const nestedFlat = flattenObject(val);
+              nestedFlat._id = nestedId;
+              nestedFlat[`${collectionName}_ref_id`] = id;
+
+              const nestedTypeMap = Object.fromEntries(
+                Object.entries(nestedFlat).map(([k, v]) => [k, inferSQLType(v)])
+              );
+
+              const nestedCreate = `CREATE TABLE IF NOT EXISTS \`${nestedTable}\` (${Object.entries(nestedTypeMap)
+                .map(([k, type]) => `\`${k}\` ${type}`)
+                .join(', ')})`;
+              await mysqlConn.query(nestedCreate);
+
+              const nestedKeys = Object.keys(nestedFlat);
+              const nestedValues = nestedKeys.map(k => nestedFlat[k]);
+              const nestedInsert = `INSERT INTO \`${nestedTable}\` (${nestedKeys.map(k => `\`${k}\``).join(', ')}) VALUES (${nestedKeys.map(() => '?').join(', ')})`;
+              await mysqlConn.query(nestedInsert, nestedValues);
+            }
+
+            delete clonedDoc[key];
+          }
+        }
+
+        const flatDoc = flattenObject(clonedDoc);
         const keys = Object.keys(flatDoc).filter(k => k && k.trim() !== "");
         if (!keys.length) continue;
 
@@ -125,39 +204,6 @@ async function transform(data, options = { normalize: true, generateER: true }) 
             await mysqlConn.query(insertQuery, values);
           } else {
             console.error(`❌ Insert Error in ${collectionName}:`, err.message);
-          }
-        }
-
-        // 🔁 Normalize nested objects into separate tables (optional)
-        if (options.normalize) {
-          for (const key in doc) {
-            const val = doc[key];
-            if (
-              typeof val === "object" &&
-              val !== null &&
-              !(val instanceof Date) &&
-              !Array.isArray(val) &&
-              !val._bsontype
-            ) {
-              const nestedTable = `${collectionName}_${key}`;
-              const nestedFlat = flattenObject(val);
-              nestedFlat[`${collectionName}_id`] = id.toString();
-
-              const nestedTypeMap = Object.fromEntries(
-                Object.entries(nestedFlat).map(([k, v]) => [k, inferSQLType(v)])
-              );
-
-              const nestedCreate = `CREATE TABLE IF NOT EXISTS \`${nestedTable}\` (${Object.entries(nestedTypeMap)
-                .map(([k, type]) => `\`${k}\` ${type}`)
-                .join(', ')})`;
-
-              await mysqlConn.query(nestedCreate);
-
-              const nestedKeys = Object.keys(nestedFlat);
-              const nestedValues = nestedKeys.map(k => nestedFlat[k]);
-              const nestedInsert = `INSERT INTO \`${nestedTable}\` (${nestedKeys.map(k => `\`${k}\``).join(', ')}) VALUES (${nestedKeys.map(() => '?').join(', ')})`;
-              await mysqlConn.query(nestedInsert, nestedValues);
-            }
           }
         }
       }
