@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Database, ArrowRight, Zap } from 'lucide-react';
 import { DatabaseConnectionForm } from './components/DatabaseConnectionForm';
-import { DataPreview } from './components/DataPreview';
 import { ConfigurationSummary } from './components/ConfigurationSummary';
 import { MigrationProgress } from './components/MigrationProgress';
 import { DatabaseConnection, ConnectionStatus, MigrationStatus, MigrationConfig } from './types/database';
-import { getAllMockData, mockColumns } from './utils/mockData';
-
+import { DataPreviewContainer } from './components/getData';
+const baseUrl = import.meta.env.VITE_BACKEND_URL; 
 function App() {
   // Connection states
 
@@ -37,7 +36,7 @@ function App() {
   const [showPreview, setShowPreview] = useState(false);
 
   // Data
-  const [previewData] = useState(getAllMockData());
+  // const [previewData] = useState(getAllMockData());
 
   const migrationConfig: MigrationConfig = {
     data: {
@@ -51,7 +50,7 @@ function App() {
   setSourceStatus('connecting');
 
   try {
-    const res = await fetch('http://localhost:3000/migrate/check', {
+    const res = await fetch(`${baseUrl}/migrate/check`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -80,7 +79,7 @@ function App() {
   setTargetStatus('connecting');
 
   try {
-    const res = await fetch('http://localhost:3000/migrate/check', {
+    const res = await fetch(`${baseUrl}/migrate/check`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -118,7 +117,7 @@ function App() {
   setMigrationStatus('migrating');
 
   try {
-    const res = await fetch('http://localhost:3000/migrate/start', {
+    const res = await fetch(`${baseUrl}/migrate/start`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -236,13 +235,7 @@ function App() {
           {/* Data Preview */}
           {showPreview && (
             <div className="space-y-8">
-              <DataPreview
-                data={previewData}
-                columns={mockColumns}
-                title="Source Data Preview"
-                isLoading={false}
-              />
-
+              <DataPreviewContainer sourceConnection={sourceConnection} />
               {/* Migration Progress */}
               {showMigrationSection && (
                 <MigrationProgress

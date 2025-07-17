@@ -17,6 +17,7 @@ export const DataPreview: React.FC<DataPreviewProps> = ({
   title,
   isLoading = false
 }) => {
+  
   const [currentPage, setCurrentPage] = useState(1);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
