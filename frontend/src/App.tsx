@@ -50,7 +50,7 @@ function App() {
   setSourceStatus('connecting');
 
   try {
-    const res = await fetch(`${baseUrl}/migrate/check`, {
+    const res = await fetch(`${baseUrl}migrate/check`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -79,7 +79,7 @@ function App() {
   setTargetStatus('connecting');
 
   try {
-    const res = await fetch(`${baseUrl}/migrate/check`, {
+    const res = await fetch(`${baseUrl}migrate/check`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -117,7 +117,7 @@ function App() {
   setMigrationStatus('migrating');
 
   try {
-    const res = await fetch(`${baseUrl}/migrate/start`, {
+    const res = await fetch(`${baseUrl}migrate/start`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
