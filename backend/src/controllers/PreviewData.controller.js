@@ -22,7 +22,7 @@ export const getMigratedData = async (req, res) => {
       const documents = await collection.find({}).toArray();
       allData[name] = documents;
     }
-
+    console.log('Fetched data from MongoDB:', allData);
     res.status(200).json(allData);
   } catch (error) {
     console.error('Error fetching data from MongoDB:', error);

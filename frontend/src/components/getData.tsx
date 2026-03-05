@@ -16,13 +16,14 @@ export const DataPreviewContainer: React.FC<Props> = ({ sourceConnection }) => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${baseUrl}migrate/data`, {
+        const res = await fetch(`${baseUrl}/migrate/data`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ data: sourceConnection }),
         });
 
         const json = await res.json();
+        console.log("this is the data",json);
         if (json && typeof json === 'object') {
           setDataMap(json);
         }
