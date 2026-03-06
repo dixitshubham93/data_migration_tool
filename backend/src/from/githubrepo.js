@@ -64,8 +64,21 @@ async function transform(data, options = { normalize: true, generateER: true }) 
     const mongoClient = source.client;
     const mysqlConn = target;
 
-    const collections = await db.listCollections().toArray();
-    const collectionNames = collections.map(c => c.name);
+    const allCollections = await db.listCollections().toArray();
+    const collectionNames = allCollections.map(c => c.name);
+
+    // Determine which collections to migrate
+    // - migrateAllCollections: true  → use all
+    // - source.collections is a non-empty array → use only those
+    // - otherwise (legacy / no selection) → use all
+    const selectedNames = data.source.collections;
+    const collections =
+      data.source.migrateAllCollections || !selectedNames || selectedNames.length === 0
+        ? allCollections
+        : allCollections.filter(c => selectedNames.includes(c.name));
+
+    console.log(`📦 Migrating ${collections.length} of ${allCollections.length} collection(s):`,
+      collections.map(c => c.name));
 
     await mysqlConn.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
     await mysqlConn.query(`USE \`${dbName}\``);

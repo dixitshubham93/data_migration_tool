@@ -26,8 +26,15 @@ export default defineConfig({
   reporter: 'html',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
-    /* Base URL to use in actions like `await page.goto('')`. */
-    // baseURL: 'http://localhost:3000',
+    /* Base URL — Vercel in CI, local Vite dev server otherwise */
+    baseURL: process.env.BASE_URL || 'http://localhost:5173',
+
+    /* Longer timeouts: MongoDB Atlas connections can take several seconds */
+    actionTimeout: 30_000,
+    navigationTimeout: 30_000,
+
+    /* Capture a screenshot on every test failure for easier debugging */
+    screenshot: 'only-on-failure',
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',

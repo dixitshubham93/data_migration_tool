@@ -19,7 +19,9 @@ export const getMigratedData = async (req, res) => {
     for (const col of collections) {
       const name = col.name;
       const collection = db.collection(name);
-      const documents = await collection.find({}).toArray();
+      // Limit preview to 100 documents per collection for performance
+      const documents = await collection.find({}).limit(100).toArray();
+      if (documents.length === 0) continue; // skip empty collections
       allData[name] = documents;
     }
     console.log('Fetched data from MongoDB:', allData);
