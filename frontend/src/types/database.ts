@@ -5,6 +5,10 @@ export interface DatabaseConnection {
   host: string;
   port: number;
   database?: string;
+  /** Selected collection names. Empty = none selected yet. */
+  collections?: string[];
+  /** When true, all collections in the database will be migrated. */
+  migrateAllCollections?: boolean;
 }
 
 export interface MigrationConfig {

@@ -29,7 +29,7 @@ export const connectToMongo = async (config) => {
   }
 
   if (db) return db;
-
+console.log("this is the uri ", uri);
   client = new MongoClient(uri);
 
   try {

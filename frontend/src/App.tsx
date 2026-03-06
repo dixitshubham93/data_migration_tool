@@ -5,7 +5,7 @@ import { ConfigurationSummary } from './components/ConfigurationSummary';
 import { MigrationProgress } from './components/MigrationProgress';
 import { DatabaseConnection, ConnectionStatus, MigrationStatus, MigrationConfig } from './types/database';
 import { DataPreviewContainer } from './components/getData';
-const baseUrl = import.meta.env.VITE_BACKEND_URL; 
+const baseUrl = import.meta.env.VITE_BACKEND_URL;
 function App() {
   // Connection states
 
@@ -34,6 +34,9 @@ function App() {
   const [sourceCollapsed, setSourceCollapsed] = useState(false);
   const [targetCollapsed, setTargetCollapsed] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  // Snapshot of sourceConnection at the moment Preview is clicked — prevents
+  // live collection-selection mutations from re-triggering the data fetch.
+  const [previewConnection, setPreviewConnection] = useState<DatabaseConnection | null>(null);
 
   // Data
   // const [previewData] = useState(getAllMockData());
@@ -47,103 +50,105 @@ function App() {
   };
 
   const handleSourceConnect = async () => {
-  setSourceStatus('connecting');
+    setSourceStatus('connecting');
 
-  try {
-    const res = await fetch(`${baseUrl}migrate/check`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        data: sourceConnection
-      }),
-      credentials: 'include'
-    });
+    try {
+      const res = await fetch(`${baseUrl}/migrate/check`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          data: sourceConnection
+        }),
+        credentials: 'include'
+      });
 
-    const result = await res.json();
-    if (res.ok && result.success) {
-      setSourceStatus('connected');
-    } else {
+      const result = await res.json();
+      if (res.ok && result.success) {
+        setSourceStatus('connected');
+      } else {
+        setSourceStatus('error');
+        console.error(result.message || 'Unknown error');
+      }
+    } catch (error) {
+      console.error('Connection error:', error);
       setSourceStatus('error');
-      console.error(result.message || 'Unknown error');
     }
-  } catch (error) {
-    console.error('Connection error:', error);
-    setSourceStatus('error');
-  }
-};
+  };
 
 
   const handleTargetConnect = async () => {
-  setTargetStatus('connecting');
+    setTargetStatus('connecting');
 
-  try {
-    const res = await fetch(`${baseUrl}migrate/check`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        data: targetConnection
-      }),
-      credentials: 'include' // Only if your backend uses cookies/sessions
-    });
+    try {
+      const res = await fetch(`${baseUrl}/migrate/check`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          data: targetConnection
+        }),
+        credentials: 'include' // Only if your backend uses cookies/sessions
+      });
 
-    const result = await res.json();
-    if (res.ok && result.success) {
-      setTargetStatus('connected');
-    } else {
+      const result = await res.json();
+      if (res.ok && result.success) {
+        setTargetStatus('connected');
+      } else {
+        setTargetStatus('error');
+        console.error(result.message || 'Unknown error');
+      }
+    } catch (error) {
+      console.error('Connection error:', error);
       setTargetStatus('error');
-      console.error(result.message || 'Unknown error');
     }
-  } catch (error) {
-    console.error('Connection error:', error);
-    setTargetStatus('error');
-  }
-};
+  };
 
 
   const handlePreviewData = async () => {
     setMigrationStatus('previewing');
     setShowPreview(false);
-    // Simulate data loading
+    // Snapshot the current connection so the preview doesn't re-fetch on every
+    // collection-selection state change that updates sourceConnection.
+    setPreviewConnection({ ...sourceConnection });
     await new Promise(resolve => setTimeout(resolve, 1500));
     setShowPreview(true);
     setMigrationStatus('ready');
   };
 
   const handleStartMigration = async () => {
-  setMigrationStatus('migrating');
+    setMigrationStatus('migrating');
 
-  try {
-    const res = await fetch(`${baseUrl}migrate/start`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        data: {
-      source: sourceConnection,
-      target: targetConnection
-    },
-    filter: {} // Replace this with your actual migration data
-      }),
-      credentials: 'include' // Only if backend uses cookies/sessions
-    });
+    try {
+      const res = await fetch(`${baseUrl}/migrate/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          data: {
+            source: sourceConnection,
+            target: targetConnection
+          },
+          filter: {} // Replace this with your actual migration data
+        }),
+        credentials: 'include' // Only if backend uses cookies/sessions
+      });
 
-    const result = await res.json();
-    if (res.ok && result.success) {
-      setMigrationStatus('completed');
-    } else {
+      const result = await res.json();
+      if (res.ok && result.success) {
+        setMigrationStatus('completed');
+      } else {
+        setMigrationStatus('error');
+        console.error(result.message || 'Migration failed');
+      }
+    } catch (error) {
+      console.error('Migration error:', error);
       setMigrationStatus('error');
-      console.error(result.message || 'Migration failed');
     }
-  } catch (error) {
-    console.error('Migration error:', error);
-    setMigrationStatus('error');
-  }
-};
+  };
 
 
   const handleReset = () => {
@@ -235,7 +240,7 @@ function App() {
           {/* Data Preview */}
           {showPreview && (
             <div className="space-y-8">
-              <DataPreviewContainer sourceConnection={sourceConnection} />
+              <DataPreviewContainer sourceConnection={previewConnection ?? sourceConnection} />
               {/* Migration Progress */}
               {showMigrationSection && (
                 <MigrationProgress
