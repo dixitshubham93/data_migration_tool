@@ -107,15 +107,20 @@ async function transform(data, options = { normalize: true, generateER: true }) 
         foreignKeys.push(...detectRelationships(sample, collectionNames));
       }
 
-      const createQuery = `CREATE TABLE IF NOT EXISTS \`${collectionName}\` (
-        \`_id\` VARCHAR(24) PRIMARY KEY,
-        ${Object.entries(fieldTypeMap)
+      const tableDefinitions = [
+        `\`_id\` VARCHAR(24) PRIMARY KEY`,
+        ...Object.entries(fieldTypeMap)
           .filter(([k]) => k !== '_id')
-          .map(([k, type]) => `\`${k}\` ${type}`)
-          .join(", ")}
-        ${foreignKeys.length ? ', ' + foreignKeys.map(fk => `FOREIGN KEY (\`${fk.column}\`) REFERENCES \`${fk.references}\`(_id)`).join(', ') : ''}
-      )`;
+          .map(([k, type]) => `\`${k}\` ${type}`),
+      ];
 
+      if (foreignKeys.length) {
+        tableDefinitions.push(
+          ...foreignKeys.map(fk => `FOREIGN KEY (\`${fk.column}\`) REFERENCES \`${fk.references}\`(_id)`)
+        );
+      }
+
+      const createQuery = `CREATE TABLE IF NOT EXISTS \`${collectionName}\` (${tableDefinitions.join(', ')})`;
       await mysqlConn.query(createQuery);
 
       if (options.generateER) {
@@ -148,9 +153,10 @@ async function transform(data, options = { normalize: true, generateER: true }) 
                   Object.entries(nestedFlat).map(([k, v]) => [k, inferSQLType(v)])
                 );
 
-                const nestedCreate = `CREATE TABLE IF NOT EXISTS \`${nestedTable}\` (${Object.entries(nestedTypeMap)
-                  .map(([k, type]) => `\`${k}\` ${type}`)
-                  .join(', ')})`;
+                const nestedDefinitions = Object.entries(nestedTypeMap).map(
+                  ([k, type]) => `\`${k}\` ${type}`
+                );
+                const nestedCreate = `CREATE TABLE IF NOT EXISTS \`${nestedTable}\` (${nestedDefinitions.join(', ')})`;
                 await mysqlConn.query(nestedCreate);
 
                 const nestedKeys = Object.keys(nestedFlat);
@@ -176,9 +182,10 @@ async function transform(data, options = { normalize: true, generateER: true }) 
                 Object.entries(nestedFlat).map(([k, v]) => [k, inferSQLType(v)])
               );
 
-              const nestedCreate = `CREATE TABLE IF NOT EXISTS \`${nestedTable}\` (${Object.entries(nestedTypeMap)
-                .map(([k, type]) => `\`${k}\` ${type}`)
-                .join(', ')})`;
+              const nestedDefinitions = Object.entries(nestedTypeMap).map(
+                ([k, type]) => `\`${k}\` ${type}`
+              );
+              const nestedCreate = `CREATE TABLE IF NOT EXISTS \`${nestedTable}\` (${nestedDefinitions.join(', ')})`;
               await mysqlConn.query(nestedCreate);
 
               const nestedKeys = Object.keys(nestedFlat);
@@ -212,11 +219,15 @@ async function transform(data, options = { normalize: true, generateER: true }) 
               if (!(k in fieldTypeMap)) {
                 const type = inferSQLType(flatDoc[k]);
                 await mysqlConn.query(`ALTER TABLE \`${collectionName}\` ADD COLUMN \`${k}\` ${type}`);
+                fieldTypeMap[k] = type;
               }
             }
             await mysqlConn.query(insertQuery, values);
           } else {
             console.error(`❌ Insert Error in ${collectionName}:`, err.message);
+            console.error('Query:', insertQuery);
+            console.error('Values:', values);
+            throw err;
           }
         }
       }
@@ -235,7 +246,7 @@ async function transform(data, options = { normalize: true, generateER: true }) 
     console.log("🎉 Migration Complete");
   } catch (err) {
     console.error("❌ Migration failed:", err.message);
-    throw "❌ Migration failed:";
+    throw err;
   }
 }
 

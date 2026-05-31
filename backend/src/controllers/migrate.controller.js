@@ -10,9 +10,10 @@ const migrate = asyncHandler(async(req, res,next)=>{
 
   try {
     if (!data) {
-      console.log("all fields must be presents");
+      throw new ApiError("Migration payload missing 'data'", 400);
     }
-  await transform(data).then(() => {
+
+    await transform(data).then(() => {
       console.log("data migrated");
       return res.status(200).json(
         new ApiResponse("successful", 200, {
