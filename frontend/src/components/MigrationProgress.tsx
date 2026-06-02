@@ -26,7 +26,7 @@ interface MigrationProgressProps {
   onReset: () => void;
 }
 
-const baseUrl = import.meta.env.VITE_BACKEND_URL;
+import { BASE_URL } from '../utils/api';
 
 export const MigrationProgress: React.FC<MigrationProgressProps> = ({
   status,
@@ -51,7 +51,7 @@ export const MigrationProgress: React.FC<MigrationProgressProps> = ({
     setLiveStatus('running');
     setShowEr(false);
 
-    const es = new EventSource(`${baseUrl}/migrate/progress/${migrationId}`);
+    const es = new EventSource(`${BASE_URL}/migrate/progress/${migrationId}`);
     eventSourceRef.current = es;
 
     es.onmessage = (event) => {
@@ -141,7 +141,7 @@ export const MigrationProgress: React.FC<MigrationProgressProps> = ({
 
     es.onerror = () => {
       // SSE disconnected — try to fetch final status
-      fetch(`${baseUrl}/migrate/status/${migrationId}`)
+      fetch(`${BASE_URL}/migrate/status/${migrationId}`)
         .then(r => r.json())
         .then(r => {
           if (r.data?.status === 'done') {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Database, Eye, EyeOff, Loader, CheckCircle, XCircle, Link, ChevronDown } from 'lucide-react';
 import { DatabaseConnection, ConnectionStatus } from '../types/database';
 
-const baseUrl = import.meta.env.VITE_BACKEND_URL;
+import { BASE_URL } from '../utils/api';
 
 interface DatabaseConnectionFormProps {
   title: string;
@@ -82,7 +82,7 @@ export const DatabaseConnectionForm: React.FC<DatabaseConnectionFormProps> = ({
     const fetchDbs = async () => {
       setLoadingDbs(true);
       try {
-        const res = await fetch(`${baseUrl}/migrate/databases`, {
+        const res = await fetch(`${BASE_URL}/migrate/databases`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ data: connection }),
@@ -116,7 +116,7 @@ export const DatabaseConnectionForm: React.FC<DatabaseConnectionFormProps> = ({
     const fetchCols = async () => {
       setLoadingCollections(true);
       try {
-        const res = await fetch(`${baseUrl}/migrate/collections`, {
+        const res = await fetch(`${BASE_URL}/migrate/collections`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ data: { ...connection, database: selectedDb } }),
