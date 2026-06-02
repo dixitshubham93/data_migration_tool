@@ -29,6 +29,7 @@ function App() {
   const [sourceStatus, setSourceStatus] = useState<ConnectionStatus>('idle');
   const [targetStatus, setTargetStatus] = useState<ConnectionStatus>('idle');
   const [migrationStatus, setMigrationStatus] = useState<MigrationStatus>('idle');
+  const [migrationId, setMigrationId] = useState<string | null>(null);
 
   // UI states
   const [sourceCollapsed, setSourceCollapsed] = useState(false);
@@ -120,29 +121,32 @@ function App() {
 
   const handleStartMigration = async () => {
     setMigrationStatus('migrating');
+    setMigrationId(null);
 
     try {
       const res = await fetch(`${baseUrl}/migrate/start`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           data: {
             source: sourceConnection,
             target: targetConnection
-          },
-          filter: {} // Replace this with your actual migration data
+          }
         }),
-        credentials: 'include' // Only if backend uses cookies/sessions
+        credentials: 'include'
       });
 
       const result = await res.json();
-      if (res.ok && result.success) {
-        setMigrationStatus('completed');
+
+      // 202 = migration accepted and running in background
+      if (res.status === 202) {
+        const id = result.data?.migrationId;
+        setMigrationId(id);
+        // MigrationProgress will open SSE stream and update status
+        setMigrationStatus('migrating');
       } else {
         setMigrationStatus('error');
-        console.error(result.message || 'Migration failed');
+        console.error(result.message || 'Migration failed to start');
       }
     } catch (error) {
       console.error('Migration error:', error);
@@ -151,10 +155,12 @@ function App() {
   };
 
 
+
   const handleReset = () => {
     setSourceStatus('idle');
     setTargetStatus('idle');
     setMigrationStatus('idle');
+    setMigrationId(null);
     setShowPreview(false);
     setSourceCollapsed(false);
     setTargetCollapsed(false);
@@ -245,6 +251,7 @@ function App() {
               {showMigrationSection && (
                 <MigrationProgress
                   status={migrationStatus}
+                  migrationId={migrationId}
                   onStartMigration={handleStartMigration}
                   onReset={handleReset}
                 />

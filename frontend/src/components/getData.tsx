@@ -6,14 +6,21 @@ interface Props {
   sourceConnection: DatabaseConnection;
 }
 
-const baseUrl = import.meta.env.VITE_BACKEND_URL; // ✅ Access base URL from env
-console.log('Base URL:', baseUrl);
+const baseUrl = import.meta.env.VITE_BACKEND_URL;
+
+/**
+ * Fetches a preview of each collection using the new paginated API:
+ *  1. POST /migrate/collections  → get collection names
+ *  2. POST /migrate/preview      → get first page of each collection
+ *
+ * Renders each collection in a DataPreview table.
+ */
 export const DataPreviewContainer: React.FC<Props> = ({ sourceConnection }) => {
   const [dataMap, setDataMap] = useState<{ [collection: string]: any[] }>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Stable cache key — only re-fetch when the actual connection target changes,
-  // NOT when collection selection or other UI state updates the object reference.
+  // Re-fetch only when the real connection target changes
   const connectionKey = JSON.stringify({
     protocol: sourceConnection.protocol,
     host: sourceConnection.host,
@@ -25,20 +32,59 @@ export const DataPreviewContainer: React.FC<Props> = ({ sourceConnection }) => {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
+      setError(null);
+      setDataMap({});
+
       try {
-        const res = await fetch(`${baseUrl}/migrate/data`, {
+        // Step 1 — get collection list for the selected database
+        const colRes = await fetch(`${baseUrl}/migrate/collections`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ data: sourceConnection }),
+          credentials: 'include',
         });
 
-        const json = await res.json();
-        console.log("this is the data", json);
-        if (json && typeof json === 'object') {
-          setDataMap(json);
+        const colJson = await colRes.json();
+        if (!colRes.ok || !colJson.success) {
+          setError(colJson.message ?? 'Failed to fetch collections');
+          return;
         }
-      } catch (error) {
-        console.error('Failed to fetch data:', error);
+
+        const collections: string[] = colJson.data?.collections ?? [];
+        if (collections.length === 0) {
+          setDataMap({});
+          return;
+        }
+
+        // Step 2 — fetch first page (10 rows) of each collection in parallel
+        const previews = await Promise.all(
+          collections.map(async (collection) => {
+            try {
+              const res = await fetch(`${baseUrl}/migrate/preview`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  source: sourceConnection,
+                  collection,
+                  pageSize: 10,
+                }),
+                credentials: 'include',
+              });
+              const json = await res.json();
+              const docs = json?.data?.documents ?? [];
+              return [collection, docs] as [string, any[]];
+            } catch {
+              return [collection, []] as [string, any[]];
+            }
+          })
+        );
+
+        // Filter out collections with 0 docs (truly empty)
+        const result = Object.fromEntries(previews.filter(([, docs]) => docs.length > 0));
+        setDataMap(result);
+      } catch (err: any) {
+        console.error('Preview failed:', err);
+        setError('Could not load data preview. Check the console for details.');
       } finally {
         setLoading(false);
       }
@@ -48,13 +94,21 @@ export const DataPreviewContainer: React.FC<Props> = ({ sourceConnection }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionKey]);
 
-
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-gray-500">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div>
         <p className="text-lg">Fetching collection data…</p>
         <p className="text-sm text-gray-400 mt-1">Large collections may take a moment</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-red-500">
+        <p className="text-lg font-medium">Preview failed</p>
+        <p className="text-sm mt-1">{error}</p>
       </div>
     );
   }
