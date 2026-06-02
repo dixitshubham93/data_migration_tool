@@ -5,7 +5,7 @@ import { ConfigurationSummary } from './components/ConfigurationSummary';
 import { MigrationProgress } from './components/MigrationProgress';
 import { DatabaseConnection, ConnectionStatus, MigrationStatus, MigrationConfig } from './types/database';
 import { DataPreviewContainer } from './components/getData';
-const baseUrl = import.meta.env.VITE_BACKEND_URL;
+import { BASE_URL } from './utils/api';
 function App() {
   // Connection states
 
@@ -54,7 +54,7 @@ function App() {
     setSourceStatus('connecting');
 
     try {
-      const res = await fetch(`${baseUrl}/migrate/check`, {
+      const res = await fetch(`${BASE_URL}/migrate/check`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -83,7 +83,7 @@ function App() {
     setTargetStatus('connecting');
 
     try {
-      const res = await fetch(`${baseUrl}/migrate/check`, {
+      const res = await fetch(`${BASE_URL}/migrate/check`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -124,7 +124,7 @@ function App() {
     setMigrationId(null);
 
     try {
-      const res = await fetch(`${baseUrl}/migrate/start`, {
+      const res = await fetch(`${BASE_URL}/migrate/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -6,7 +6,7 @@ interface Props {
   sourceConnection: DatabaseConnection;
 }
 
-const baseUrl = import.meta.env.VITE_BACKEND_URL;
+import { BASE_URL } from '../utils/api';
 
 /**
  * Fetches a preview of each collection using the new paginated API:
@@ -37,7 +37,7 @@ export const DataPreviewContainer: React.FC<Props> = ({ sourceConnection }) => {
 
       try {
         // Step 1 — get collection list for the selected database
-        const colRes = await fetch(`${baseUrl}/migrate/collections`, {
+        const colRes = await fetch(`${BASE_URL}/migrate/collections`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ data: sourceConnection }),
@@ -60,7 +60,7 @@ export const DataPreviewContainer: React.FC<Props> = ({ sourceConnection }) => {
         const previews = await Promise.all(
           collections.map(async (collection) => {
             try {
-              const res = await fetch(`${baseUrl}/migrate/preview`, {
+              const res = await fetch(`${BASE_URL}/migrate/preview`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
