@@ -1,120 +1,396 @@
-# Data Migration Tool
-[![Ask DeepWiki](https://devin.ai/assets/askdeepwiki.png)](https://deepwiki.com/dixitshubham93/data_migration_tool)
+# 🗄️ MongoDB → MySQL Migration Tool
 
-A full-stack application designed to facilitate seamless data migration from a MongoDB source to a MySQL target. The tool provides a user-friendly interface to configure, preview, and execute the migration process.
+<div align="center">
 
-The core migration engine automatically infers a relational schema from schemaless MongoDB documents, handles nested objects and arrays by creating normalized tables, and intelligently manages data insertion.
+![Migration Tool](https://img.shields.io/badge/MongoDB-→-MySQL-green?style=for-the-badge&logo=mongodb)
+![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?style=for-the-badge&logo=nodedotjs)
+![Express](https://img.shields.io/badge/Express-4.x-000000?style=for-the-badge&logo=express)
+![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript)
+![Playwright](https://img.shields.io/badge/Tested%20with-Playwright-2EAD33?style=for-the-badge&logo=playwright)
 
-## Features
+**A production-grade, full-stack tool to migrate MongoDB collections to MySQL with zero data loss, real-time progress streaming, and automatic schema inference.**
 
-- **Dual Database Support**: Connect to a MongoDB source and a MySQL target.
-- **Connection Testing**: Validate source and target database credentials before migration.
-- **Data Preview**: Inspect data from source MongoDB collections directly in the UI before committing to the migration.
-- **Automated Schema Inference**: Intelligently creates a MySQL schema by analyzing MongoDB documents and inferring appropriate SQL data types (`VARCHAR`, `DOUBLE`, `BOOLEAN`, `JSON`, etc.).
-- **Normalization of Nested Data**: Automatically handles nested objects and arrays by creating separate, linked tables in MySQL to maintain data integrity and relational structure.
-- **Relationship Detection**: Infers foreign key relationships between collections based on `Id` field naming conventions.
-- **Interactive UI**: A clean, modern frontend built with React, TypeScript, and TailwindCSS to guide the user through the migration process.
-- **Real-time Feedback**: Visual indicators for connection status and migration progress.
+[Live Demo](https://data-migration-tool-ivory.vercel.app) · [Report a Bug](https://github.com/dixitshubham93/data_migration_tool/issues) · [Request Feature](https://github.com/dixitshubham93/data_migration_tool/issues)
 
-## Tech Stack
+</div>
 
-- **Backend**:
-  - **Framework**: Node.js, Express.js
-  - **Database Drivers**: `mongodb`, `mysql2`
-  - **Environment**: `dotenv`, `cors`
-- **Frontend**:
-  - **Framework/Library**: React, TypeScript, Vite
-  - **Styling**: TailwindCSS
-  - **Icons**: `lucide-react`
-- **Development**:
-  - **Linting/Formatting**: ESLint, Prettier
-  - **Dev Server**: `nodemon` (backend), Vite (frontend)
+---
 
-## How It Works
+## ✨ Features
 
-The migration logic is the core of this application. When a migration is initiated:
+| Feature | Description |
+|---|---|
+| 🔌 **Visual Connection Manager** | Connect to MongoDB (local/Atlas) and MySQL with real-time ping |
+| 🔍 **Smart Schema Discovery** | Hybrid `$sample` + tail cursor scan — no `.toArray()`, O(1) memory |
+| 📊 **Data Preview** | Paginated table view of every collection before migrating |
+| ⚡ **Batch Insertion** | 500 rows per `INSERT` — ~500× fewer MySQL round trips |
+| 🔄 **Real-time SSE Progress** | Live per-collection progress bars via Server-Sent Events |
+| 🏛️ **ER Diagram** | Auto-generated entity–relationship diagram after migration |
+| 🔁 **Resume Capability** | File-persisted checkpoints — resume from exactly where it stopped |
+| 🔀 **Transaction Safety** | Per-collection `BEGIN/COMMIT/ROLLBACK` — failed collection reverts cleanly |
+| 🔗 **FK Detection & Apply** | Heuristic foreign key detection with user-confirmed application |
+| 🧪 **Dry-Run Mode** | Preview schema and DDL without touching MySQL |
+| 📜 **Migration History** | Disk-persisted log of all past migrations |
+| 🛡️ **Input Validation** | Per-route middleware rejects bad requests before any DB call |
 
-1.  **Connection**: The backend establishes a connection to both the source MongoDB database and the target MySQL server.
-2.  **Database Creation**: It creates the target database in MySQL if it doesn't already exist, using the name of the source MongoDB database.
-3.  **Schema Inference**: For each collection in MongoDB, the tool:
-    - Samples a subset of documents to analyze their structure.
-    - Infers an appropriate SQL data type for each field.
-    - Identifies nested objects and arrays which require normalization.
-4.  **Table Creation**:
-    - A primary table is created in MySQL corresponding to the MongoDB collection.
-    - Nested objects and arrays are moved into their own separate tables. A foreign key (`<parent_table>_ref_id`) is added to link them back to the primary record, effectively normalizing the data.
-5.  **Data Transfer**:
-    - The tool iterates through all documents in the source collection.
-    - Each document is flattened and transformed into a format suitable for SQL insertion.
-    - Data is inserted into the corresponding primary and nested tables in MySQL.
-    - The process handles dynamic schema changes by adding new columns to a table if they are discovered in documents processed later.
+---
 
-## Getting Started
+## 🏗️ Architecture
+
+### System Overview
+
+```mermaid
+graph TB
+    subgraph Frontend["🖥️ Frontend (React + Vite)"]
+        UI[Connection Forms]
+        Preview[Data Preview Table]
+        Progress[Migration Progress + SSE]
+        ER[ER Diagram Panel]
+    end
+
+    subgraph Backend["⚙️ Backend (Express + Node.js)"]
+        Router[Express Router]
+        
+        subgraph Controllers
+            ConnCtrl[connection.controller]
+            MigCtrl[migrate.controller]
+            PreviewCtrl[preview.controller]
+        end
+
+        subgraph Services["services/migration/"]
+            Orch[orchestrator.js]
+            Schema[schemaDiscovery.js]
+            DDL[ddl.js — DDLManager]
+            Batch[batchInserter.js]
+            Checkpoint[checkpointStore.js]
+            DryRun[dryRun.js]
+            FKMgr[foreignKeyManager.js]
+        end
+
+        subgraph Connections
+            MongoConn[mongo.connection.js]
+            MySQLConn[mysql.connection.js]
+        end
+
+        SSE[SSE EventEmitter]
+    end
+
+    subgraph Storage
+        MongoDB[(MongoDB Source)]
+        MySQL[(MySQL Target)]
+        Disk[📁 data/checkpoints/]
+    end
+
+    UI -->|POST /check| ConnCtrl
+    Preview -->|POST /preview| PreviewCtrl
+    Progress -->|POST /start| MigCtrl
+    Progress -->|GET /progress/:id SSE| SSE
+    ER -->|GET /:id/er-diagram| MigCtrl
+
+    ConnCtrl --> MongoConn
+    MigCtrl --> Orch
+    Orch --> Schema
+    Orch --> DDL
+    Orch --> Batch
+    Orch --> Checkpoint
+    Orch --> SSE
+
+    Schema --> MongoConn --> MongoDB
+    Batch --> MySQLConn --> MySQL
+    Checkpoint --> Disk
+```
+
+### Migration Data Flow
+
+```mermaid
+sequenceDiagram
+    participant FE as Frontend
+    participant API as Express API
+    participant Orch as Orchestrator
+    participant Mongo as MongoDB
+    participant MySQL as MySQL
+
+    FE->>API: POST /migrate/start
+    API-->>FE: 202 + migrationId
+    FE->>API: GET /progress/:id (SSE open)
+
+    loop For each collection
+        Orch->>Mongo: $sample(500) aggregate
+        Orch->>Mongo: tail cursor scan (last 500)
+        Note over Orch: Merge schemas, detect FKs
+        
+        Orch->>MySQL: CREATE TABLE (DDL)
+        MySQL-->>Orch: OK
+
+        Orch->>MySQL: BEGIN TRANSACTION
+        
+        loop cursor.batchSize(1000) — O(1) memory
+            Orch->>Mongo: fetch batch of docs
+            Orch->>MySQL: INSERT IGNORE (500 rows)
+            API-->>FE: SSE progress event
+        end
+
+        Orch->>MySQL: COMMIT
+        API-->>FE: SSE collection_done
+    end
+
+    Orch->>Disk: save checkpoint + ER diagram
+    API-->>FE: SSE complete + erDiagram
+```
+
+### Schema Discovery Strategy
+
+```mermaid
+flowchart LR
+    Start([Collection]) --> Phase1
+
+    subgraph Phase1["Phase 1 — $sample"]
+        S1[aggregate $sample 500 docs]
+        S1 --> S2[Infer field types]
+        S2 --> S3[Detect nested objects → child tables]
+        S3 --> S4[Detect FK references]
+    end
+
+    Phase1 --> Decision{totalDocs > 1000?}
+    
+    Decision -->|Yes| Phase2
+    Decision -->|No| Finalize
+
+    subgraph Phase2["Phase 2 — Tail Scan"]
+        T1[find.sort _id desc .limit 500]
+        T1 --> T2[Merge with Phase 1 schema]
+        T2 --> T3[Resolve type conflicts INT→TEXT]
+    end
+
+    Phase2 --> Finalize
+    Finalize([fieldTypeMap + nestedSchemas + foreignKeys])
+```
+
+---
+
+## 🗂️ Project Structure
+
+```
+migration_tool/
+├── backend/
+│   └── src/
+│       ├── connections/
+│       │   ├── mongo.connection.js     # URI builder + MongoClient factory
+│       │   └── mysql.connection.js     # mysql2 pool + ping utility
+│       ├── controllers/
+│       │   ├── connection.controller.js # check, listDatabases, listCollections
+│       │   ├── migrate.controller.js    # start, resume, dryRun, history, SSE, ER, FK
+│       │   └── preview.controller.js   # paginated collection preview
+│       ├── middlewares/
+│       │   ├── error.middleware.js      # global error handler
+│       │   └── validate.middleware.js   # per-route input validation
+│       ├── services/
+│       │   ├── migration/
+│       │   │   ├── orchestrator.js      # top-level coordinator
+│       │   │   ├── schemaDiscovery.js   # hybrid $sample + tail cursor
+│       │   │   ├── ddl.js              # DDLManager: CREATE/ALTER TABLE
+│       │   │   ├── batchInserter.js    # 500-row INSERT batching
+│       │   │   ├── typeMapper.js       # SQL type inference + conflict resolution
+│       │   │   ├── flattener.js        # nested → flat, FK heuristics
+│       │   │   ├── checkpointStore.js  # file-persisted resume state
+│       │   │   ├── dryRun.js           # schema preview, no MySQL writes
+│       │   │   └── foreignKeyManager.js # detect + apply FK constraints
+│       │   └── preview/
+│       │       └── previewService.js   # paginated MongoDB preview
+│       ├── routes/
+│       │   └── migrateRouter.js
+│       └── App.js
+├── frontend/
+│   └── src/
+│       ├── components/
+│       │   ├── DatabaseConnectionForm.tsx  # credential inputs + DB/collection picker
+│       │   ├── DataPreview.tsx             # sortable table component
+│       │   ├── getData.tsx                 # preview data fetcher
+│       │   ├── MigrationProgress.tsx       # SSE stream + ER diagram panel
+│       │   └── ConfigurationSummary.tsx
+│       ├── types/
+│       │   └── database.ts
+│       └── App.tsx
+├── tests/
+│   └── smoke.spec.ts                   # Playwright end-to-end smoke tests
+├── data/
+│   └── checkpoints/                    # per-migration JSON state files
+├── playwright.config.js
+└── README.md
+```
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
 
-- Node.js (v16.20.1 or higher)
-- npm (Node Package Manager)
-- An accessible MongoDB instance (source)
-- An accessible MySQL instance (target)
+| Tool | Version |
+|---|---|
+| Node.js | 18+ |
+| MongoDB | 6+ (or Atlas) |
+| MySQL | 8+ |
+| npm | 9+ |
 
-### Installation & Setup
+### 1. Clone & Install
 
-1.  **Clone the repository:**
-    ```sh
-    git clone https://github.com/dixitshubham93/data_migration_tool.git
-    cd data_migration_tool
-    ```
+```bash
+git clone https://github.com/dixitshubham93/data_migration_tool.git
+cd data_migration_tool
 
-2.  **Set up the Backend:**
-    - Navigate to the backend directory: `cd backend`
-    - Install dependencies:
-      ```sh
-      npm install
-      ```
-    - Create a `.env` file in the `backend` directory and add the following variables:
-      ```env
-      PORT=8000
-      FRONTEND_URL=http://localhost:5173
-      ```
-    - Start the backend server:
-      ```sh
-      npm run server
-      ```
-      The server will be running on `http://localhost:8000`.
+# Backend
+cd backend && npm install
 
-3.  **Set up the Frontend:**
-    - Navigate to the frontend directory: `cd ../frontend`
-    - Install dependencies:
-      ```sh
-      npm install
-      ```
-    - Create a `.env` file in the `frontend` directory and add the backend URL:
-      ```env
-      VITE_BACKEND_URL=http://localhost:8000/
-      ```
-    - Start the frontend development server:
-      ```sh
-      npm run dev
-      ```
-      The application will be accessible at `http://localhost:5173`.
+# Frontend
+cd ../frontend && npm install
+```
 
-## Usage
+### 2. Configure Environment
 
-1.  Open your browser and navigate to `http://localhost:5173`.
-2.  **Configure Source**: Fill in the connection details for your source MongoDB database and click "Test Connection".
-3.  **Configure Target**: Fill in the connection details for your target MySQL database and click "Test Connection".
-4.  **Preview Data**: Once both connections are successful, click the "Preview Data" button. This will fetch data from your MongoDB collections and display them in tables.
-5.  **Start Migration**: After reviewing the data, scroll down to the "Migration Progress" section and click "Start Migration".
-6.  The UI will show the migration status. Once completed, your data will be available in the target MySQL database.
+Create `backend/.env`:
 
-## API Endpoints
+```env
+FRONTEND_URL=http://localhost:5173
+PORT=3000
+```
 
-The backend exposes the following REST API endpoints under the `/migrate` prefix:
+### 3. Start Development Servers
 
--   `POST /migrate/check`: Tests a given database connection configuration.
-    -   **Body**: `{ "data": DatabaseConnection }`
--   `POST /migrate/start`: Initiates the full data migration process.
-    -   **Body**: `{ "data": { "source": DatabaseConnection, "target": DatabaseConnection } }`
--   `POST /migrate/data`: Fetches sample data from the source database for the UI preview.
-    -   **Body**: `{ "data": DatabaseConnection }`
+```bash
+# Terminal 1 — Backend
+cd backend
+npm run server        # nodemon, auto-restart on changes
+
+# Terminal 2 — Frontend
+cd frontend
+npm run dev           # Vite dev server at http://localhost:5173
+```
+
+---
+
+## 📡 API Reference
+
+### Connection
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/migrate/check` | Ping source or target DB |
+| `POST` | `/migrate/databases` | List MongoDB databases |
+| `POST` | `/migrate/collections` | List collections in a DB |
+
+### Migration
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/migrate/start` | Start migration → 202 + `migrationId` |
+| `POST` | `/migrate/resume/:id` | Resume failed/partial migration |
+| `POST` | `/migrate/dry-run` | Schema preview, no MySQL writes |
+| `GET` | `/migrate/status/:id` | Polling status (checkpoint state) |
+| `GET` | `/migrate/progress/:id` | **SSE** — real-time per-collection events |
+| `GET` | `/migrate/history` | All past migrations (disk-persisted) |
+
+### Post-Migration
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/migrate/:id/er-diagram` | Stored ER diagram as JSON |
+| `GET` | `/migrate/:id/foreign-keys` | Detected FK relationships |
+| `POST` | `/migrate/:id/apply-fk` | Apply confirmed FK constraints |
+
+### Preview
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/migrate/preview` | Paginated collection data preview |
+
+---
+
+## 🧪 Testing
+
+Tests run against the live Vercel deployment in CI, and against `localhost:5173` locally.
+
+```bash
+# Install Playwright browsers (first time only)
+npx playwright install --with-deps
+
+# Run all tests
+npx playwright test
+
+# Interactive UI mode
+npx playwright test --ui
+
+# Specific browser
+npx playwright test --project=chromium
+```
+
+CI runs on every push to `main`, `master`, and `work` branches via GitHub Actions.
+
+---
+
+## ⚙️ Configuration Options
+
+Pass `options` inside the migration request body to tune behaviour:
+
+```json
+{
+  "data": {
+    "source": { ... },
+    "target": { ... },
+    "options": {
+      "scanMode": "hybrid",       // "sample" | "hybrid" | "full_scan"
+      "stopOnError": false,       // abort all remaining collections on first failure
+      "sampleSize": 500,          // docs to $sample in schema discovery
+      "tailSize": 500             // docs for tail scan phase
+    }
+  }
+}
+```
+
+| `scanMode` | Accuracy | Speed | Use when |
+|---|---|---|---|
+| `sample` | Good | Fastest | Dev / small collections |
+| `hybrid` | Better | Fast | **Default — recommended** |
+| `full_scan` | Perfect | Slow | Critical accuracy required |
+
+---
+
+## 🔁 Resume a Failed Migration
+
+If a migration fails mid-way (network drop, MySQL timeout, etc.):
+
+1. The checkpoint is saved to `data/checkpoints/<migrationId>.json` automatically
+2. Already-completed collections are preserved
+3. Call `POST /migrate/resume/:migrationId` with the same source/target config
+4. The orchestrator skips completed collections and continues from where it stopped
+
+---
+
+## 🏛️ ER Diagram
+
+After a successful migration, the ER diagram is:
+- Returned in the `complete` SSE event
+- Stored in the checkpoint file
+- Available via `GET /migrate/:id/er-diagram`
+- Rendered in the frontend as expandable table cards with column types, PK/FK badges, and relationship arrows
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feat/your-feature`
+3. Commit using [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `refactor:`
+4. Push and open a Pull Request against `main`
+
+---
+
+## 📄 License
+
+ISC License — see [LICENSE](./LICENSE) for details.
+
+---
+
+<div align="center">
+Built by <a href="https://github.com/dixitshubham93">Shubham Dixit</a>
+</div>
