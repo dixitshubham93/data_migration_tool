@@ -52,11 +52,54 @@ function detectRelationships(doc, collectionNames) {
   return references;
 }
 
+// Tracks known columns per nested table across all documents
+const nestedTableSchemas = {};
+
+async function insertWithSchemaEvolution(mysqlConn, tableName, flatDoc) {
+  const keys = Object.keys(flatDoc).filter(k => k && k.trim() !== "");
+  if (!keys.length) return;
+
+  const values = keys.map(k => {
+    const val = flatDoc[k];
+    if (val === null || val === undefined) return null;
+    if (typeof val === 'object' && !(val instanceof Date)) return JSON.stringify(val);
+    return val;
+  });
+
+  const insertQuery = `INSERT INTO \`${tableName}\` (${keys.map(k => `\`${k}\``).join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`;
+
+  try {
+    await mysqlConn.query(insertQuery, values);
+  } catch (err) {
+    if (err.code === 'ER_BAD_FIELD_ERROR' || err.code === 'ER_WRONG_VALUE_COUNT_ON_ROW') {
+      const knownCols = nestedTableSchemas[tableName] || {};
+      for (const k of keys) {
+        if (!(k in knownCols)) {
+          const type = inferSQLType(flatDoc[k]);
+          try {
+            await mysqlConn.query(`ALTER TABLE \`${tableName}\` ADD COLUMN \`${k}\` ${type}`);
+            knownCols[k] = type;
+          } catch (alterErr) {
+            if (alterErr.code !== 'ER_DUP_FIELDNAME') throw alterErr;
+          }
+        }
+      }
+      nestedTableSchemas[tableName] = knownCols;
+      await mysqlConn.query(insertQuery, values);
+    } else {
+      throw err;
+    }
+  }
+}
+
 async function transform(data, options = { normalize: true, generateER: true }) {
   console.log("🚀 Migration function execution started");
 
   const dbName = data.source.database;
   const erDiagram = [];
+
+  // Reset nested table schema cache for this migration run
+  for (const key of Object.keys(nestedTableSchemas)) delete nestedTableSchemas[key];
 
   try {
     const { source, target } = await makeConnection(data);
@@ -149,20 +192,19 @@ async function transform(data, options = { normalize: true, generateER: true }) 
                 nestedFlat._id = itemId;
                 nestedFlat[`${collectionName}_ref_id`] = id;
 
-                const nestedTypeMap = Object.fromEntries(
-                  Object.entries(nestedFlat).map(([k, v]) => [k, inferSQLType(v)])
-                );
+                // Create table from first-seen schema; evolution handled in helper
+                if (!nestedTableSchemas[nestedTable]) {
+                  const nestedTypeMap = Object.fromEntries(
+                    Object.entries(nestedFlat).map(([k, v]) => [k, inferSQLType(v)])
+                  );
+                  const nestedDefinitions = Object.entries(nestedTypeMap).map(
+                    ([k, type]) => `\`${k}\` ${type}`
+                  );
+                  await mysqlConn.query(`CREATE TABLE IF NOT EXISTS \`${nestedTable}\` (${nestedDefinitions.join(', ')})`);
+                  nestedTableSchemas[nestedTable] = { ...nestedTypeMap };
+                }
 
-                const nestedDefinitions = Object.entries(nestedTypeMap).map(
-                  ([k, type]) => `\`${k}\` ${type}`
-                );
-                const nestedCreate = `CREATE TABLE IF NOT EXISTS \`${nestedTable}\` (${nestedDefinitions.join(', ')})`;
-                await mysqlConn.query(nestedCreate);
-
-                const nestedKeys = Object.keys(nestedFlat);
-                const nestedValues = nestedKeys.map(k => nestedFlat[k]);
-                const nestedInsert = `INSERT INTO \`${nestedTable}\` (${nestedKeys.map(k => `\`${k}\``).join(', ')}) VALUES (${nestedKeys.map(() => '?').join(', ')})`;
-                await mysqlConn.query(nestedInsert, nestedValues);
+                await insertWithSchemaEvolution(mysqlConn, nestedTable, nestedFlat);
               }
             }
 
@@ -178,20 +220,19 @@ async function transform(data, options = { normalize: true, generateER: true }) 
               nestedFlat._id = nestedId;
               nestedFlat[`${collectionName}_ref_id`] = id;
 
-              const nestedTypeMap = Object.fromEntries(
-                Object.entries(nestedFlat).map(([k, v]) => [k, inferSQLType(v)])
-              );
+              // Create table from first-seen schema; evolution handled in helper
+              if (!nestedTableSchemas[nestedTable]) {
+                const nestedTypeMap = Object.fromEntries(
+                  Object.entries(nestedFlat).map(([k, v]) => [k, inferSQLType(v)])
+                );
+                const nestedDefinitions = Object.entries(nestedTypeMap).map(
+                  ([k, type]) => `\`${k}\` ${type}`
+                );
+                await mysqlConn.query(`CREATE TABLE IF NOT EXISTS \`${nestedTable}\` (${nestedDefinitions.join(', ')})`);
+                nestedTableSchemas[nestedTable] = { ...nestedTypeMap };
+              }
 
-              const nestedDefinitions = Object.entries(nestedTypeMap).map(
-                ([k, type]) => `\`${k}\` ${type}`
-              );
-              const nestedCreate = `CREATE TABLE IF NOT EXISTS \`${nestedTable}\` (${nestedDefinitions.join(', ')})`;
-              await mysqlConn.query(nestedCreate);
-
-              const nestedKeys = Object.keys(nestedFlat);
-              const nestedValues = nestedKeys.map(k => nestedFlat[k]);
-              const nestedInsert = `INSERT INTO \`${nestedTable}\` (${nestedKeys.map(k => `\`${k}\``).join(', ')}) VALUES (${nestedKeys.map(() => '?').join(', ')})`;
-              await mysqlConn.query(nestedInsert, nestedValues);
+              await insertWithSchemaEvolution(mysqlConn, nestedTable, nestedFlat);
             }
 
             delete clonedDoc[key];
@@ -204,6 +245,7 @@ async function transform(data, options = { normalize: true, generateER: true }) 
 
         const values = keys.map(k => {
           const val = flatDoc[k];
+          if (val === null || val === undefined) return null;
           if (typeof val === 'object' && !(val instanceof Date)) return JSON.stringify(val);
           return val;
         });
@@ -214,12 +256,17 @@ async function transform(data, options = { normalize: true, generateER: true }) 
         try {
           await mysqlConn.query(insertQuery, values);
         } catch (err) {
-          if (err.code === 'ER_BAD_FIELD_ERROR') {
+          if (err.code === 'ER_BAD_FIELD_ERROR' || err.code === 'ER_WRONG_VALUE_COUNT_ON_ROW') {
+            // Add ALL missing columns first, then retry once
             for (const k of keys) {
               if (!(k in fieldTypeMap)) {
                 const type = inferSQLType(flatDoc[k]);
-                await mysqlConn.query(`ALTER TABLE \`${collectionName}\` ADD COLUMN \`${k}\` ${type}`);
-                fieldTypeMap[k] = type;
+                try {
+                  await mysqlConn.query(`ALTER TABLE \`${collectionName}\` ADD COLUMN \`${k}\` ${type}`);
+                  fieldTypeMap[k] = type;
+                } catch (alterErr) {
+                  if (alterErr.code !== 'ER_DUP_FIELDNAME') throw alterErr;
+                }
               }
             }
             await mysqlConn.query(insertQuery, values);
