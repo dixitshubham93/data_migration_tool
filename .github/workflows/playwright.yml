@@ -2,7 +2,7 @@ name: Playwright Tests
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, work]
   pull_request:
     branches: [main, master]
 
@@ -21,21 +21,22 @@ jobs:
         with:
           node-version: lts/*
 
-      - name: Install test dependencies
+      # Root package.json contains the playwright dependency and config
+      - name: Install dependencies
         run: npm ci
-        working-directory: tests
+        working-directory: .
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
-        working-directory: tests
+        working-directory: .
 
       - name: Run Playwright tests
         run: npx playwright test
-        working-directory: tests
+        working-directory: .
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
           name: playwright-report
-          path: tests/playwright-report/
+          path: playwright-report/
           retention-days: 30
