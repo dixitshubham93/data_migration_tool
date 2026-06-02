@@ -1,0 +1,234 @@
+{
+  "migrationId": "1b2ff6b1-c6d3-4933-801b-a9bfcbf9de36",
+  "status": "done",
+  "startedAt": "2026-06-02T14:19:38.959Z",
+  "completedAt": "2026-06-02T14:19:40.522Z",
+  "collections": {
+    "payments": {
+      "status": "done",
+      "processedDocs": 2,
+      "totalDocs": 2,
+      "error": null
+    },
+    "theatres": {
+      "status": "done",
+      "processedDocs": 2,
+      "totalDocs": 2,
+      "error": null
+    },
+    "reviews": {
+      "status": "done",
+      "processedDocs": 2,
+      "totalDocs": 2,
+      "error": null
+    },
+    "users": {
+      "status": "done",
+      "processedDocs": 2,
+      "totalDocs": 2,
+      "error": null
+    },
+    "bookings": {
+      "status": "done",
+      "processedDocs": 2,
+      "totalDocs": 2,
+      "error": null
+    },
+    "movies": {
+      "status": "done",
+      "processedDocs": 2,
+      "totalDocs": 2,
+      "error": null
+    },
+    "coupons": {
+      "status": "done",
+      "processedDocs": 2,
+      "totalDocs": 2,
+      "error": null
+    },
+    "shows": {
+      "status": "done",
+      "processedDocs": 2,
+      "totalDocs": 2,
+      "error": null
+    }
+  },
+  "erDiagram": [
+    {
+      "table": "payments",
+      "columns": {
+        "_id": "VARCHAR(24)",
+        "bookingId": "VARCHAR(255)",
+        "amount": "INT",
+        "method": "VARCHAR(255)",
+        "status": "VARCHAR(255)",
+        "transactionId": "VARCHAR(255)"
+      },
+      "foreignKeys": [
+        {
+          "column": "bookingId",
+          "refTable": "bookings"
+        }
+      ]
+    },
+    {
+      "table": "theatres",
+      "columns": {
+        "_id": "VARCHAR(24)",
+        "name": "VARCHAR(255)",
+        "city": "VARCHAR(255)",
+        "facilities": "JSON"
+      },
+      "foreignKeys": []
+    },
+    {
+      "table": "theatres_screens",
+      "columns": {
+        "_id": "VARCHAR(24)",
+        "theatres_ref_id": "VARCHAR(24)",
+        "screenNumber": "INT",
+        "capacity": "INT"
+      },
+      "foreignKeys": []
+    },
+    {
+      "table": "reviews",
+      "columns": {
+        "_id": "VARCHAR(24)",
+        "userId": "VARCHAR(255)",
+        "movieId": "VARCHAR(255)",
+        "rating": "INT",
+        "comment": "VARCHAR(255)"
+      },
+      "foreignKeys": [
+        {
+          "column": "userId",
+          "refTable": "users"
+        },
+        {
+          "column": "movieId",
+          "refTable": "movies"
+        }
+      ]
+    },
+    {
+      "table": "users",
+      "columns": {
+        "_id": "VARCHAR(24)",
+        "username": "VARCHAR(255)",
+        "email": "VARCHAR(255)",
+        "phone": "VARCHAR(255)",
+        "age": "INT"
+      },
+      "foreignKeys": []
+    },
+    {
+      "table": "users_address",
+      "columns": {
+        "_id": "VARCHAR(24)",
+        "users_ref_id": "VARCHAR(24)",
+        "city": "VARCHAR(255)",
+        "state": "VARCHAR(255)",
+        "pincode": "VARCHAR(255)"
+      },
+      "foreignKeys": []
+    },
+    {
+      "table": "users_preferences",
+      "columns": {
+        "_id": "VARCHAR(24)",
+        "users_ref_id": "VARCHAR(24)",
+        "favoriteGenres": "JSON",
+        "language": "VARCHAR(255)"
+      },
+      "foreignKeys": []
+    },
+    {
+      "table": "bookings",
+      "columns": {
+        "_id": "VARCHAR(24)",
+        "userId": "VARCHAR(255)",
+        "showId": "VARCHAR(255)",
+        "bookingDate": "DATETIME",
+        "totalAmount": "INT",
+        "status": "VARCHAR(255)"
+      },
+      "foreignKeys": [
+        {
+          "column": "userId",
+          "refTable": "users"
+        },
+        {
+          "column": "showId",
+          "refTable": "shows"
+        }
+      ]
+    },
+    {
+      "table": "bookings_seats",
+      "columns": {
+        "_id": "VARCHAR(24)",
+        "bookings_ref_id": "VARCHAR(24)",
+        "seatNumber": "VARCHAR(255)",
+        "price": "INT"
+      },
+      "foreignKeys": []
+    },
+    {
+      "table": "movies",
+      "columns": {
+        "_id": "VARCHAR(24)",
+        "title": "VARCHAR(255)",
+        "genre": "JSON",
+        "duration": "INT",
+        "rating": "DOUBLE",
+        "releaseDate": "DATETIME",
+        "languages": "JSON"
+      },
+      "foreignKeys": []
+    },
+    {
+      "table": "movies_cast",
+      "columns": {
+        "_id": "VARCHAR(24)",
+        "movies_ref_id": "VARCHAR(24)",
+        "name": "VARCHAR(255)",
+        "role": "VARCHAR(255)"
+      },
+      "foreignKeys": []
+    },
+    {
+      "table": "coupons",
+      "columns": {
+        "_id": "VARCHAR(24)",
+        "code": "VARCHAR(255)",
+        "discount": "INT",
+        "isActive": "BOOLEAN",
+        "expiryDate": "DATETIME"
+      },
+      "foreignKeys": []
+    },
+    {
+      "table": "shows",
+      "columns": {
+        "_id": "VARCHAR(24)",
+        "movieId": "VARCHAR(255)",
+        "theatreId": "VARCHAR(255)",
+        "screenNumber": "INT",
+        "showTime": "DATETIME",
+        "ticketPrice": "INT"
+      },
+      "foreignKeys": [
+        {
+          "column": "movieId",
+          "refTable": "movies"
+        },
+        {
+          "column": "theatreId",
+          "refTable": "theatres"
+        }
+      ]
+    }
+  ],
+  "errors": []
+}
